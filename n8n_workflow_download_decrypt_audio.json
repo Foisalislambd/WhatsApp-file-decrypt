@@ -1,0 +1,95 @@
+{
+  "name": "Download + Decrypt Audio",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "Manual Trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.AUDIO_URL}}",
+        "responseFormat": "file",
+        "binaryPropertyName": "data",
+        "download": true
+      },
+      "id": "HTTP Request",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 5,
+      "position": [
+        540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const crypto = require('crypto');\n\nconst keyB64 = $env.AUDIO_KEY_BASE64;\nconst ivB64 = $env.AUDIO_IV_BASE64;\n\nif (!keyB64 || !ivB64) {\n  throw new Error('Missing AUDIO_KEY_BASE64 or AUDIO_IV_BASE64 environment variables');\n}\n\nconst key = Buffer.from(keyB64, 'base64');\nconst iv = Buffer.from(ivB64, 'base64');\n\nreturn items.map((item, idx) => {\n  if (!item.binary || !item.binary.data || !item.binary.data.data) {\n    throw new Error('Expected binary data on property \\"data\\" from HTTP Request node');\n  }\n  const encryptedBuffer = Buffer.from(item.binary.data.data, 'base64');\n\n  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);\n  const decrypted = Buffer.concat([decipher.update(encryptedBuffer), decipher.final()]);\n\n  const original = item.binary.data;\n  const originalFileName = original.fileName || 'audio_encrypted';\n  const newFileName = originalFileName.replace(/(\.[^./\\]+)?$/, '_decrypted$1');\n\n  item.binary.data = {\n    data: decrypted.toString('base64'),\n    fileName: newFileName,\n    mimeType: original.mimeType || 'application/octet-stream'\n  };\n\n  return item;\n});"
+      },
+      "id": "Decrypt",
+      "name": "Decrypt (AES-256-CBC)",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        820,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fileName": "=/data/{{$binary.data.fileName || 'audio_decrypted'}}",
+        "binaryPropertyName": "data"
+      },
+      "id": "Write Binary File",
+      "name": "Write Decrypted to /data",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Decrypt (AES-256-CBC)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decrypt (AES-256-CBC)": {
+      "main": [
+        [
+          {
+            "node": "Write Decrypted to /data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}
