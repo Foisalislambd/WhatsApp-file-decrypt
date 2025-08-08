@@ -1,0 +1,42 @@
+/**
+ * n8n Function node template
+ * Processes input items and returns an array of items.
+ * Customize `shouldKeep` and `transform` to fit your workflow.
+ */
+
+const filterEnabled = false;
+
+function shouldKeep(data, index) {
+  return true;
+}
+
+function transform(data, index) {
+  return {
+    ...data,
+    itemIndex: index,
+    processedAt: new Date().toISOString(),
+  };
+}
+
+const outputItems = [];
+for (let index = 0; index < items.length; index++) {
+  const incoming = items[index];
+  const data = (incoming && incoming.json) ? incoming.json : {};
+
+  if (filterEnabled && !shouldKeep(data, index)) {
+    continue;
+  }
+
+  const newData = transform(data, index);
+  outputItems.push({
+    ...incoming,
+    json: newData,
+  });
+}
+
+// If no inputs, you can also start from scratch:
+// if (items.length === 0) {
+//   outputItems.push({ json: { hello: 'world' } });
+// }
+
+return outputItems;
